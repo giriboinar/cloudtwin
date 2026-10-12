@@ -1,0 +1,15 @@
+---
+# CloudTwin — variables for the [app_servers] group.
+# Overridable per host by setting the same key under a host in hosts.yml.
+
+# Unprivileged user that owns /opt/cloudtwin and runs the stack.
+deploy_user: "deploy"
+
+# Server-local timezone.
+app_timezone: "Asia/Kolkata"
+
+# Application directory on the target host.
+app_dir: "/opt/cloudtwin"
+
+# Port the API listens on inside the container/host; used by the health check.
+app_port: 8000

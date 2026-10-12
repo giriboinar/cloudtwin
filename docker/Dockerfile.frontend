@@ -1,0 +1,24 @@
+# CloudTwin — Frontend Dockerfile
+# ---------------------------------------------------------------------------
+# Build context: the repository root (docker compose passes `context: ../`).
+# Expects:  app/frontend/index.html, app/frontend/app.js, app/frontend/style.css
+#           docker/nginx.conf
+# The JS calls the API via relative paths (/api/...), so nginx reverse-proxies
+# /api/ -> api:8000 (see nginx.conf). No build step: this is plain static HTML.
+# ---------------------------------------------------------------------------
+# NOTE on users: nginx:alpine's default image starts nginx as root and then
+# drops to the `nginx` user for worker processes. Running the container as
+# fully non-root would additionally require remapping /var/cache/nginx,
+# /var/run and the port (we stay on 80, a privileged port). That hardening
+# is left for the production variant; this image follows the upstream default.
+FROM nginx:alpine
+
+# Static site files.
+COPY app/frontend/ /usr/share/nginx/html/
+
+# Our server config: static serving + /api/, /health, /metrics proxying.
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+# nginx:alpine's default CMD (daemon off) is kept.

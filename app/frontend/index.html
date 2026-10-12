@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudTwin — Task Board</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">&#9729;</span>
+        <div>
+          <h1>CloudTwin</h1>
+          <p class="subtitle">Multi-Cloud DevOps Platform &middot; Task Board</p>
+        </div>
+      </div>
+      <div class="health" id="healthBadge" title="API status">
+        <span class="dot" id="healthDot"></span>
+        <span id="healthText">checking&hellip;</span>
+      </div>
+    </header>
+
+    <main class="card">
+      <form id="taskForm" class="task-form" autocomplete="off">
+        <input
+          id="titleInput"
+          class="input"
+          type="text"
+          placeholder="Add a new task&hellip;"
+          maxlength="200"
+          required
+        />
+        <input
+          id="descInput"
+          class="input"
+          type="text"
+          placeholder="Description (optional)"
+        />
+        <button class="btn btn-primary" type="submit">Add task</button>
+      </form>
+
+      <div class="filters" role="group" aria-label="Filter tasks">
+        <button class="chip active" data-filter="all" type="button">All</button>
+        <button class="chip" data-filter="active" type="button">Active</button>
+        <button class="chip" data-filter="completed" type="button">Completed</button>
+        <span class="count" id="taskCount"></span>
+      </div>
+
+      <p class="error" id="errorBox" hidden></p>
+
+      <ul class="task-list" id="taskList"></ul>
+      <p class="empty" id="emptyState" hidden>No tasks yet &mdash; add your first one above.</p>
+    </main>
+
+    <footer class="footer">
+      <span>CloudTwin API &middot; <code>/api/tasks</code></span>
+      <a href="/metrics" target="_blank" rel="noopener">metrics</a>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

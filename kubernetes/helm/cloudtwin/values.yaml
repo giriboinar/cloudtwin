@@ -1,0 +1,40 @@
+replicaCount: 2
+
+image:
+  # Replace with your real ECR registry, e.g.
+  # 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+  repository: <ECR_URL>/cloudtwin-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  # Replace with your real domain.
+  host: cloudtwin.example.com
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+env:
+  APP_ENV: production
+  LOG_LEVEL: info
+  # Placeholder only — override at install time, e.g.
+  # --set secrets.databaseUrl="postgresql://..."
+  DATABASE_URL: "REPLACE_ME"

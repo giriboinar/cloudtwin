@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cloudtwin-api
+  namespace: cloudtwin
+  labels:
+    app.kubernetes.io/name: cloudtwin
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: cloudtwin
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    # Replace with your real domain before applying.
+    - host: cloudtwin.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloudtwin-api
+                port:
+                  number: 80

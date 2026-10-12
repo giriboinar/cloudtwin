@@ -1,0 +1,129 @@
+// -----------------------------------------------------------------------------
+// Alternative to GitHub Actions — pick one.
+// This declarative Jenkins pipeline mirrors .github/workflows/ci.yml + cd.yml:
+//   Checkout -> Test -> SonarQube (optional) -> Build image -> Trivy scan
+//   -> Push to ECR -> Deploy
+//
+// Required Jenkins credentials:
+//   - 'aws-creds'    (Amazon Web Services, for the ECR push)
+//   - 'ec2-ssh-key'  (SSH private key, for the EC2 deploy)
+//   - 'sonar-token'  (Secret text, OPTIONAL — SonarQube scan is skipped when absent)
+// Agent requirements: Docker, Python 3.12, AWS CLI, Trivy (or it will be run
+// from the aquasec/trivy container below).
+// -----------------------------------------------------------------------------
+
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'cloudtwin-backend'
+        AWS_REGION = 'ap-south-1'       // change to your region
+        ECR_REPO   = 'cloudtwin-backend' // ECR repository name
+        EC2_USER   = 'ubuntu'           // adjust to your EC2 login user
+        EC2_DIR    = '/opt/cloudtwin'
+    }
+
+    parameters {
+        string(name: 'EC2_HOST', defaultValue: '',
+               description: 'EC2 public DNS / IP to deploy to')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install -r app/backend/requirements.txt
+                    pytest app/backend/tests
+                '''
+            }
+        }
+
+        stage('SonarQube (optional)') {
+            steps {
+                script {
+                    // Skipped gracefully when the 'sonar-token' credential is not configured.
+                    try {
+                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                            sh 'sonar-scanner -Dsonar.login=$SONAR_TOKEN'
+                        }
+                    } catch (Exception e) {
+                        echo "SonarQube scan skipped: credential 'sonar-token' not configured"
+                    }
+                }
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                sh "docker build -f docker/Dockerfile.backend -t ${IMAGE_NAME}:${env.GIT_COMMIT} ."
+            }
+        }
+
+        stage('Trivy scan') {
+            steps {
+                // Report HIGH/CRITICAL, fail the build only on CRITICAL.
+                sh """
+                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
+                      aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 \\
+                      --no-progress ${IMAGE_NAME}:${env.GIT_COMMIT}
+                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
+                      aquasec/trivy image --severity CRITICAL --exit-code 1 \\
+                      --no-progress ${IMAGE_NAME}:${env.GIT_COMMIT}
+                """
+            }
+        }
+
+        stage('Push to ECR') {
+            when { branch 'main' }
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-creds']]) {
+                    sh '''
+                        REGISTRY="$(aws ecr describe-registry --query registryId --output text --region $AWS_REGION).dkr.ecr.$AWS_REGION.amazonaws.com"
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY
+                        docker tag $IMAGE_NAME:$GIT_COMMIT $REGISTRY/$ECR_REPO:$GIT_COMMIT
+                        docker tag $IMAGE_NAME:$GIT_COMMIT $REGISTRY/$ECR_REPO:latest
+                        docker push $REGISTRY/$ECR_REPO:$GIT_COMMIT
+                        docker push $REGISTRY/$ECR_REPO:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { return params.EC2_HOST?.trim() }
+                }
+            }
+            steps {
+                sshagent(credentials: ['ec2-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no $EC2_USER@${EC2_HOST} << 'EOF'
+                        set -e
+                        cd /opt/cloudtwin
+                        docker compose pull
+                        docker compose up -d
+                        curl -f http://localhost:8000/health
+                        EOF
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker image prune -f || true'
+        }
+    }
+}

@@ -1,0 +1,57 @@
+---
+# CloudTwin — OS hardening for Amazon Linux 2023.
+# Safe to run repeatedly (all tasks are idempotent).
+
+- name: Harden the app server
+  hosts: app_servers
+  become: true
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+
+  tasks:
+    - name: Update all installed packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: Create the deploy user
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        shell: /bin/bash
+        groups: wheel
+        append: true
+        create_home: true
+        state: present
+
+    - name: Allow deploy user passwordless sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/deploy
+        content: "deploy ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -cf %s"
+
+    - name: Disable SSH password authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: Restart sshd
+
+    - name: Read the current timezone
+      ansible.builtin.command:
+        cmd: timedatectl show --property=Timezone --value
+      register: current_timezone
+      changed_when: false
+
+    - name: Set the timezone to Asia/Kolkata
+      ansible.builtin.command:
+        cmd: "timedatectl set-timezone {{ app_timezone }}"
+      when: current_timezone.stdout != app_timezone

@@ -1,0 +1,38 @@
+# -----------------------------------------------------------------------------
+# CloudTwin — Continuous Deployment
+#
+# Triggers: manually (workflow_dispatch) or when a GitHub Release is published.
+#
+# Deploys the latest pushed image to the EC2 host over SSH:
+#   cd /opt/cloudtwin && docker compose pull && docker compose up -d
+# then verifies the rollout with a health check on the backend.
+#
+# Ansible alternative: replace the appleboy/ssh-action step with the Ansible
+# playbook instead — see ci-cd/README.md (e.g.
+#   ansible-playbook -i ansible/inventory/prod.ini ansible/playbooks/deploy.yml
+# picks up the same pull + up + health-check sequence idempotently).
+# -----------------------------------------------------------------------------
+name: CD
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/cloudtwin
+            docker compose pull
+            docker compose up -d
+            curl -f http://localhost:8000/health

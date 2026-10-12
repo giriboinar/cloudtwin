@@ -1,0 +1,20 @@
+[
+  "tests/test_api.py::test_create_task",
+  "tests/test_api.py::test_create_task_defaults_completed_false",
+  "tests/test_api.py::test_create_task_empty_title",
+  "tests/test_api.py::test_create_task_missing_title",
+  "tests/test_api.py::test_create_task_title_too_long",
+  "tests/test_api.py::test_delete_task",
+  "tests/test_api.py::test_delete_task_not_found",
+  "tests/test_api.py::test_get_task_by_id",
+  "tests/test_api.py::test_get_task_not_found",
+  "tests/test_api.py::test_health",
+  "tests/test_api.py::test_list_tasks",
+  "tests/test_api.py::test_list_tasks_empty",
+  "tests/test_api.py::test_metrics_endpoint",
+  "tests/test_api.py::test_ready",
+  "tests/test_api.py::test_toggle_completed",
+  "tests/test_api.py::test_update_task_invalid_title_rejected",
+  "tests/test_api.py::test_update_task_not_found",
+  "tests/test_api.py::test_update_task_title"
+]

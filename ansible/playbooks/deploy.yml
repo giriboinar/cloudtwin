@@ -1,0 +1,60 @@
+---
+# CloudTwin — deploy the application stack with Docker Compose.
+# Safe to run repeatedly: copies are checksum-based and compose up -d
+# only recreates containers whose config changed.
+
+- name: Deploy the CloudTwin stack
+  hosts: app_servers
+  become: true
+
+  tasks:
+    - name: Create the application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0755"
+
+    - name: Copy docker-compose.yml to the server
+      # src paths below are relative to the playbook directory (playbooks/),
+      # which is how ansible.builtin.copy resolves relative paths.
+      ansible.builtin.copy:
+        src: ../files/docker-compose.yml
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0644"
+
+    - name: Copy the Prometheus monitoring config to the server
+      ansible.builtin.copy:
+        src: ../files/monitoring/prometheus.yml
+        dest: "{{ app_dir }}/monitoring/prometheus.yml"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0644"
+
+    - name: Pull the latest container images
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.yml pull
+        chdir: "{{ app_dir }}"
+      become_user: "{{ deploy_user }}"
+      register: compose_pull
+      changed_when: "'Downloaded newer image' in compose_pull.stdout"
+
+    - name: Start the stack in detached mode
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.yml up -d
+        chdir: "{{ app_dir }}"
+      become_user: "{{ deploy_user }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout"
+
+    - name: Wait for the API health endpoint to respond
+      ansible.builtin.uri:
+        url: http://localhost:8000/health
+        status_code: 200
+      register: health
+      until: health.status == 200
+      retries: 30
+      delay: 10

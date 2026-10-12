@@ -1,0 +1,27 @@
+---
+# CloudTwin — install Docker Engine + Compose plugin on Amazon Linux 2023.
+# Safe to run repeatedly (all tasks are idempotent).
+
+- name: Install and configure Docker
+  hosts: app_servers
+  become: true
+
+  tasks:
+    - name: Install docker and the compose plugin via dnf
+      ansible.builtin.dnf:
+        name:
+          - docker
+          - docker-compose-plugin
+        state: present
+
+    - name: Start and enable the docker service
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add the deploy user to the docker group
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        groups: docker
+        append: true

@@ -1,0 +1,49 @@
+# CloudTwin — Backend Dockerfile (multi-stage)
+# ---------------------------------------------------------------------------
+# Build context: the repository root (docker compose passes `context: ../`).
+# Expects:  app/backend/main.py
+#           app/backend/requirements.txt
+# Runtime:  uvicorn backend.main:app --host 0.0.0.0 --port 8000 (run from /code so "backend" is a package)
+# ---------------------------------------------------------------------------
+
+# ---------- Stage 1: builder ----------
+# Installs pinned Python deps into an isolated prefix so the runtime image
+# ships only what the app needs (smaller attack surface + smaller layer).
+FROM python:3.12-slim AS builder
+
+WORKDIR /install
+
+# Copy requirements FIRST so the dependency layer is cached across code edits.
+# (.dockerignore at the repo root keeps venvs, .git, __pycache__, etc. out
+# of the build context.)
+COPY app/backend/requirements.txt ./
+
+RUN pip install --no-cache-dir --prefix=/install/deps \
+        -r requirements.txt
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.12-slim AS runtime
+
+WORKDIR /code
+
+# Bring in only the installed site-packages and console scripts.
+COPY --from=builder /install/deps /usr/local
+
+# Then the application code, kept as the `backend` package so the
+# relative imports inside main.py resolve (mirrors how tests import it).
+COPY app/backend/ ./backend/
+
+# Run as a non-root user (least privilege). python:3.12-slim has no
+# pre-existing app user, so create one explicitly.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /code
+
+USER appuser
+
+EXPOSE 8000
+
+# Container is healthy when the app answers its own health endpoint.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

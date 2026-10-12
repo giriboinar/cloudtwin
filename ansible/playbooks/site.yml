@@ -1,0 +1,8 @@
+---
+# CloudTwin — main playbook.
+# Runs hardening, then Docker setup, then the application deploy, in order.
+# Variables come from inventory/group_vars/app_servers.yml.
+
+- import_playbook: hardening.yml
+- import_playbook: docker.yml
+- import_playbook: deploy.yml

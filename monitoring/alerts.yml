@@ -1,0 +1,29 @@
+groups:
+  - name: cloudtwin-api-alerts
+    rules:
+      - alert: APIDown
+        expr: up{job="cloudtwin-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CloudTwin API is down"
+          description: "The cloudtwin-api scrape target has been unreachable for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate on CloudTwin API"
+          description: "The rate of HTTP 5xx responses from cloudtwin-api has exceeded 0.05/sec for more than 5 minutes."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on CloudTwin API"
+          description: "The p95 request latency of cloudtwin-api has exceeded 1 second for more than 5 minutes."

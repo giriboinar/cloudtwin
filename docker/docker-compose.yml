@@ -1,0 +1,100 @@
+# CloudTwin — local development stack.
+# ---------------------------------------------------------------------------
+# Run from this directory once the app layer exists:
+#
+#   docker compose up --build
+#
+# Layout assumed by the compose file (relative to this docker/ directory):
+#   ../app/backend/main.py, ../app/backend/requirements.txt
+#   ../app/frontend/index.html, ../app/frontend/app.js, ../app/frontend/style.css
+#   ../monitoring/prometheus.yml   (scrapes http://api:8000/metrics)
+#
+# DEV-ONLY defaults: every credential below is a documented placeholder for
+# local dev. DEV ONLY - override in production (via env_file / secrets).
+# ---------------------------------------------------------------------------
+
+services:
+  api:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: cloudtwin-api
+    environment:
+      # DEV ONLY - override in production.
+      DATABASE_URL: postgresql://cloudtwin:cloudtwin@postgres:5432/cloudtwin
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudtwin-postgres
+    environment:
+      # DEV ONLY - override in production.
+      POSTGRES_DB: cloudtwin
+      POSTGRES_USER: cloudtwin
+      POSTGRES_PASSWORD: cloudtwin
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudtwin -d cloudtwin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: cloudtwin-prometheus
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: cloudtwin-grafana
+    environment:
+      # DEV ONLY - override in production.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.frontend
+    container_name: cloudtwin-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: cloudtwin-pgdata
+  grafana-data:
+    name: cloudtwin-grafana-data

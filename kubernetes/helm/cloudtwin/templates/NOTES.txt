@@ -1,0 +1,23 @@
+Thank you for installing {{ .Chart.Name }}.
+
+CloudTwin API is being deployed to your cluster.
+
+Next steps:
+
+1. Verify the pods are running:
+   kubectl get pods -l app.kubernetes.io/name={{ include "cloudtwin.name" . }},app.kubernetes.io/instance={{ .Release.Name }}
+
+2. Check the probes are passing:
+   kubectl describe deployment {{ include "cloudtwin.fullname" . }}
+
+{{- if .Values.ingress.enabled }}
+
+3. Add this to your hosts file (or DNS) to reach the API:
+   {{ .Values.ingress.host }}
+{{- end }}
+
+Remember: the default DATABASE_URL is "REPLACE_ME". Set the real
+connection string before production use:
+
+  helm upgrade {{ .Release.Name }} ./helm/cloudtwin \
+    --set env.DATABASE_URL="postgresql://user:pass@host:5432/cloudtwin"
