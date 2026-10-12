@@ -3,6 +3,11 @@
 # Core networking: resource group, virtual network, subnet.
 # ---------------------------------------------------------------------------
 
+provider "azurerm" {
+  # Required by the azurerm provider (v3 and v4). Empty block = defaults.
+  features {}
+}
+
 resource "azurerm_resource_group" "this" {
   name     = "${var.project_name}-azure-${var.environment}"
   location = var.location
